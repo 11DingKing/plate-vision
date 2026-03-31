@@ -20,7 +20,8 @@ from .schemas import (
     RecognitionResponse, ImageRecognitionRequest, UrlRecognitionRequest,
     HealthResponse, BatchRecognitionRequest, BatchRecognitionResponse,
     PlateDetectionResult, BoundingBox, CharResultSchema, PlateTypeEnum,
-    VideoRecognitionRequest, VideoRecognitionResponse, FrameResult, CharBoundingBox
+    VideoRecognitionRequest, VideoRecognitionResponse, FrameResult, CharBoundingBox,
+    HistoryResponse
 )
 from ..detector import PlateDetector
 from ..detector.plate_detector import VideoPlateDetector
@@ -32,6 +33,7 @@ from ..utils.constants import (
     SUPPORTED_VIDEO_FORMATS
 )
 from ..utils.output_saver import save_recognition_result, get_output_saver
+from ..utils.database import add_recognition_record
 
 # 创建路由器
 router = APIRouter()
@@ -367,7 +369,19 @@ async def _process_image(
         "plate_count": len(plates),
         "plates": plates
     }
-    
+
+    # 将识别结果写入数据库
+    try:
+        for plate in plates:
+            add_recognition_record(
+                plate_number=plate["plate_number"],
+                confidence=plate["confidence"],
+                plate_type=plate["plate_type"],
+                image_id=image_id
+            )
+    except Exception as e:
+        logger.warning(f"写入识别历史数据库失败: {e}")
+
     # 保存识别结果到本地文件 (JSON/XML)
     try:
         saved_path = save_recognition_result(result_data, image_id)
@@ -534,6 +548,33 @@ async def get_stats():
         "uptime_seconds": round(uptime, 2),
         "uptime_formatted": f"{int(uptime // 3600)}h {int((uptime % 3600) // 60)}m"
     }
+
+
+@router.get("/history", response_model=HistoryResponse, tags=["系统"])
+async def get_history(
+    page: int = Query(1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量")
+):
+    """
+    获取识别历史记录
+    
+    支持分页查询，按识别时间倒序排列，最新的记录在前
+    """
+    try:
+        from ..utils.database import get_recognition_history
+        result = get_recognition_history(page=page, page_size=page_size)
+        return HistoryResponse(
+            code=0,
+            message="获取历史记录成功",
+            data=result
+        )
+    except Exception as e:
+        logger.error(f"获取历史记录失败: {e}")
+        return HistoryResponse(
+            code=500,
+            message=f"获取历史记录失败: {str(e)}",
+            data=None
+        )
 
 
 # ==================== 视频流处理API ====================
@@ -761,7 +802,17 @@ async def websocket_video_stream(websocket: WebSocket):
                         ]
                     }
                     plates.append(plate_info)
-                    unique_plates.add(result.plate_number)
+                    if result.plate_number not in unique_plates:
+                        unique_plates.add(result.plate_number)
+                        try:
+                            add_recognition_record(
+                                plate_number=result.plate_number,
+                                confidence=result.confidence,
+                                plate_type=det.plate_type,
+                                image_id=f"ws_stream_frame_{frame_number}"
+                            )
+                        except Exception as e:
+                            logger.warning(f"写入识别历史数据库失败: {e}")
                 
                 processing_time = (time.time() - frame_start) * 1000
                 
@@ -891,11 +942,20 @@ async def _process_video_file(
                 
                 plates.append(plate_info)
                 
-                # 记录唯一车牌
+                # 记录唯一车牌并写入数据库
                 plate_number = plate_info.get("plate_number", "")
                 confidence = plate_info.get("confidence", 0)
                 if plate_number and confidence > 0.5:
                     unique_plates.add(plate_number)
+                    try:
+                        add_recognition_record(
+                            plate_number=plate_number,
+                            confidence=confidence,
+                            plate_type=plate_info.get("plate_type", "unknown"),
+                            image_id=f"{video_id}_frame_{frame_number}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"写入识别历史数据库失败: {e}")
             
             processing_time = (time.time() - frame_start) * 1000
             processing_times.append(processing_time)

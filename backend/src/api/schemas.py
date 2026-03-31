@@ -193,3 +193,42 @@ class VideoStreamConfig(BaseModel):
     target_fps: int = Field(default=25, ge=1, le=60, description="目标帧率")
     buffer_size: int = Field(default=5, ge=1, le=30, description="缓冲区大小")
     skip_similar_frames: bool = Field(default=True, description="是否跳过相似帧")
+
+
+class HistoryRecord(BaseModel):
+    """识别历史记录"""
+    id: int = Field(..., description="记录ID")
+    recognition_time: str = Field(..., description="识别时间（ISO格式）")
+    plate_number: str = Field(..., description="车牌号")
+    confidence: float = Field(..., ge=0, le=1, description="置信度")
+    plate_type: PlateTypeEnum = Field(..., description="车牌类型")
+
+
+class HistoryResponse(BaseModel):
+    """识别历史响应"""
+    code: int = Field(default=0, description="状态码，0表示成功")
+    message: str = Field(default="success", description="响应消息")
+    data: Optional[Dict[str, Any]] = Field(default=None, description="响应数据")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "code": 0,
+                "message": "获取历史记录成功",
+                "data": {
+                    "total": 100,
+                    "page": 1,
+                    "page_size": 20,
+                    "total_pages": 5,
+                    "records": [
+                        {
+                            "id": 1,
+                            "recognition_time": "2024-01-01T12:00:00",
+                            "plate_number": "京A12345",
+                            "confidence": 0.98,
+                            "plate_type": "blue"
+                        }
+                    ]
+                }
+            }
+        }
