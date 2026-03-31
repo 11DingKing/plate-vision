@@ -1,0 +1,38 @@
+# ============================================
+# 车牌识别系统 Docker Compose
+# ============================================
+
+services:
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lpr-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/output:/app/output
+      - ./backend/models:/app/models  # 移除只读限制，允许下载模型
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    networks:
+      - lpr-network
+
+networks:
+  lpr-network:
+    driver: bridge

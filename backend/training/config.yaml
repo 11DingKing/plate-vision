@@ -1,0 +1,128 @@
+# 车牌识别系统 - 模型训练配置
+
+# 数据路径配置
+data:
+  detection_dir: "./data/detection"
+  characters_dir: "./data/characters"
+  output_dir: "./models"
+  
+# 车牌检测模型训练配置 (YOLOv8)
+detection:
+  # 基础模型选择: yolov8n, yolov8s, yolov8m, yolov8l, yolov8x
+  base_model: "yolov8n.pt"
+  
+  # 训练参数
+  epochs: 100
+  batch_size: 16
+  img_size: 640
+  
+  # 优化器参数
+  optimizer: "AdamW"
+  lr0: 0.01                    # 初始学习率
+  lrf: 0.01                    # 最终学习率 (lr0 * lrf)
+  momentum: 0.937
+  weight_decay: 0.0005
+  warmup_epochs: 3.0
+  warmup_momentum: 0.8
+  
+  # 数据增强
+  augmentation:
+    hsv_h: 0.015               # HSV-色调增强
+    hsv_s: 0.7                 # HSV-饱和度增强
+    hsv_v: 0.4                 # HSV-亮度增强
+    degrees: 15.0              # 旋转角度 (±15°)
+    translate: 0.1             # 平移
+    scale: 0.5                 # 缩放
+    shear: 5.0                 # 剪切
+    perspective: 0.0005        # 透视变换
+    flipud: 0.0                # 上下翻转 (车牌不适用)
+    fliplr: 0.0                # 左右翻转 (车牌不适用)
+    mosaic: 0.5                # Mosaic 增强
+    mixup: 0.1                 # Mixup 增强
+    
+  # 损失函数权重
+  loss:
+    box: 7.5                   # 边界框损失权重
+    cls: 0.5                   # 分类损失权重
+    dfl: 1.5                   # DFL 损失权重
+    
+  # 验证和保存
+  val_interval: 1              # 每N个epoch验证一次
+  save_period: 10              # 每N个epoch保存一次
+  patience: 50                 # 早停轮数
+  
+# 字符分类器训练配置
+classification:
+  # 骨干网络: resnet18, resnet34, mobilenet_v3_small, efficientnet_b0
+  backbone: "resnet18"
+  
+  # 训练参数
+  epochs: 50
+  batch_size: 64
+  img_height: 40
+  img_width: 20
+  num_classes: 68              # 31省份 + 24字母 + 10数字 + 3特殊字符
+  
+  # 优化器
+  optimizer: "Adam"
+  lr: 0.001
+  weight_decay: 0.0001
+  
+  # 学习率调度
+  scheduler: "CosineAnnealingLR"
+  T_max: 50                    # 周期
+  eta_min: 0.00001             # 最小学习率
+  
+  # 数据增强
+  augmentation:
+    random_rotation: 5         # 随机旋转 (±5°)
+    random_scale: [0.9, 1.1]   # 随机缩放
+    gaussian_noise: 0.02       # 高斯噪声
+    gaussian_blur: 0.1         # 高斯模糊概率
+    brightness: 0.2            # 亮度调整
+    contrast: 0.2              # 对比度调整
+    
+  # 验证
+  val_split: 0.1               # 验证集比例
+  
+# 特殊场景微调配置
+fine_tuning:
+  # 针对污损/遮挡车牌
+  degraded:
+    base_model: "./models/plate_detector.pt"
+    epochs: 30
+    lr0: 0.001                 # 较小的学习率
+    freeze_layers: 10          # 冻结前N层
+    
+  # 针对黑牌/白牌等特殊车牌
+  special_plates:
+    base_model: "./models/plate_detector.pt"
+    epochs: 30
+    lr0: 0.001
+    class_weights:             # 类别权重 (提升特殊车牌权重)
+      blue: 1.0
+      yellow: 1.0
+      green: 1.0
+      white: 2.0               # 白牌权重提升
+      black: 2.0               # 黑牌权重提升
+      
+# 硬件配置
+hardware:
+  device: "auto"               # auto, cpu, cuda, mps
+  workers: 4                   # 数据加载线程数
+  amp: true                    # 混合精度训练
+  
+# 日志配置
+logging:
+  tensorboard: true
+  wandb: false
+  log_interval: 10             # 每N个batch记录一次
+  
+# 导出配置
+export:
+  formats:
+    - onnx
+    - torchscript
+  opset: 12                    # ONNX opset 版本
+  simplify: true               # 简化 ONNX 模型
+  dynamic: false               # 动态输入尺寸

@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+venv/
+ENV/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 日志和输出
+logs/*.log
+output/*
+!output/.gitkeep
+
+# Docker
+Dockerfile
+.dockerignore
+
+# 文档
+*.md
+
+# 其他
+.DS_Store
+tmp/

@@ -1,0 +1,122 @@
+# 车牌识别系统配置文件
+
+# 服务器配置
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  reload: false
+
+# 模型配置
+model:
+  # 车牌检测模型
+  detector:
+    type: "yolov8"  # yolov8, yolov5
+    weights: "models/plate_detect.pt"
+    confidence_threshold: 0.5
+    iou_threshold: 0.45
+    max_detections: 10
+    device: "cpu"  # cpu, cuda, mps
+  
+  # 字符识别模型
+  recognizer:
+    type: "paddleocr"  # paddleocr, crnn
+    use_gpu: false
+    lang: "ch"
+
+# 图像处理配置
+image:
+  # 支持的输入格式
+  supported_formats:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+    - ".webp"
+  
+  # 分辨率限制
+  min_resolution: [640, 480]
+  max_resolution: [3840, 2160]
+  
+  # 预处理参数
+  preprocessing:
+    denoise: true
+    denoise_strength: 10
+    contrast_enhance: true
+    contrast_alpha: 1.2
+    white_balance: true
+    undistort: false
+
+# 视频处理配置
+video:
+  supported_formats:
+    - ".mp4"
+    - ".avi"
+    - ".mkv"
+    - ".mov"
+  target_fps: 25
+  buffer_size: 30
+
+# 车牌类型配置
+plate_types:
+  blue:
+    name: "蓝牌(普通小型车)"
+    pattern: "^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{5}$"
+    char_count: 7
+  
+  yellow:
+    name: "黄牌(大型车)"
+    pattern: "^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{5}$"
+    char_count: 7
+  
+  green:
+    name: "绿牌(新能源)"
+    pattern: "^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][DF][A-HJ-NP-Z0-9]{5}$|^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{5}[DF]$"
+    char_count: 8
+  
+  white:
+    name: "白牌(军警车)"
+    pattern: "^[A-Z]{2}[0-9]{5}$"
+    char_count: 7
+  
+  black:
+    name: "黑牌(外资/涉外)"
+    pattern: "^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{4}[港澳]$"
+    char_count: 7
+
+# 输出配置
+output:
+  format: "both"  # json, xml, both (默认同时保存两种格式)
+  save_local: true  # 默认启用本地保存
+  output_dir: "output"
+  include_image: false
+  
+# 日志配置
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
+  rotation: "10 MB"
+  retention: "7 days"
+  log_dir: "logs"
+
+# 性能配置
+performance:
+  batch_size: 1
+  num_threads: 4
+  use_fp16: false
+  cache_enabled: true
+  cache_size: 100
+  
+  # CPU 优化选项（用于在 CPU 上达到 100ms 目标）
+  cpu_optimization:
+    enabled: true
+    # 输入图像最大尺寸（自动缩放）
+    max_input_size: 1280
+    # 使用轻量级检测模式
+    lightweight_detection: true
+    # OCR 优化参数
+    ocr_use_angle_cls: false
+    ocr_rec_batch_num: 1
+    # 跳过低置信度区域的详细分析
+    skip_low_confidence: true
+    low_confidence_threshold: 0.3
