@@ -193,3 +193,35 @@ class VideoStreamConfig(BaseModel):
     target_fps: int = Field(default=25, ge=1, le=60, description="目标帧率")
     buffer_size: int = Field(default=5, ge=1, le=30, description="缓冲区大小")
     skip_similar_frames: bool = Field(default=True, description="是否跳过相似帧")
+
+
+class HistoryRecord(BaseModel):
+    """识别历史记录"""
+    id: int = Field(..., description="记录ID")
+    recognition_time: str = Field(..., description="识别时间")
+    plate_number: str = Field(..., description="车牌号")
+    confidence: float = Field(..., ge=0, le=1, description="置信度")
+    plate_type: str = Field(..., description="车牌类型")
+    image_id: Optional[str] = Field(default=None, description="图像ID")
+
+
+class PaginationInfo(BaseModel):
+    """分页信息"""
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    total: int = Field(..., description="总记录数")
+    total_pages: int = Field(..., description="总页数")
+
+
+class HistoryResponse(BaseModel):
+    """历史记录响应"""
+    code: int = Field(default=0, description="状态码")
+    message: str = Field(default="success", description="响应消息")
+    data: Optional[Dict[str, Any]] = Field(default=None, description="响应数据")
+
+
+class HistoryStatsResponse(BaseModel):
+    """历史统计响应"""
+    code: int = Field(default=0, description="状态码")
+    message: str = Field(default="success", description="响应消息")
+    data: Optional[Dict[str, Any]] = Field(default=None, description="响应数据")
