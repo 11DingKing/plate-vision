@@ -20,7 +20,8 @@ from .schemas import (
     RecognitionResponse, ImageRecognitionRequest, UrlRecognitionRequest,
     HealthResponse, BatchRecognitionRequest, BatchRecognitionResponse,
     PlateDetectionResult, BoundingBox, CharResultSchema, PlateTypeEnum,
-    VideoRecognitionRequest, VideoRecognitionResponse, FrameResult, CharBoundingBox
+    VideoRecognitionRequest, VideoRecognitionResponse, FrameResult, CharBoundingBox,
+    HistoryResponse
 )
 from ..detector import PlateDetector
 from ..detector.plate_detector import VideoPlateDetector
@@ -32,6 +33,7 @@ from ..utils.constants import (
     SUPPORTED_VIDEO_FORMATS
 )
 from ..utils.output_saver import save_recognition_result, get_output_saver
+from ..utils.history_manager import get_history_manager
 
 # 创建路由器
 router = APIRouter()
@@ -376,6 +378,19 @@ async def _process_image(
     except Exception as e:
         logger.warning(f"保存本地文件失败: {e}")
     
+    # 保存识别结果到历史数据库
+    try:
+        history_manager = get_history_manager()
+        for plate in plates:
+            history_manager.add_record(
+                image_id=image_id,
+                plate_number=plate["plate_number"],
+                confidence=plate["confidence"],
+                plate_type=plate["plate_type"]
+            )
+    except Exception as e:
+        logger.warning(f"保存历史记录失败: {e}")
+    
     return RecognitionResponse(
         code=ResponseCode.SUCCESS,
         message=RESPONSE_MESSAGES[ResponseCode.SUCCESS],
@@ -534,6 +549,35 @@ async def get_stats():
         "uptime_seconds": round(uptime, 2),
         "uptime_formatted": f"{int(uptime // 3600)}h {int((uptime % 3600) // 60)}m"
     }
+
+
+@router.get("/history", response_model=HistoryResponse, tags=["历史记录"])
+async def get_recognition_history(
+    page: int = Query(1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(20, ge=1, le=100, description="每页大小，最大100条")
+):
+    """
+    获取识别历史记录
+    
+    按识别时间倒序返回，支持分页查询
+    """
+    try:
+        history_manager = get_history_manager()
+        result = history_manager.get_records(page=page, page_size=page_size)
+        
+        return HistoryResponse(
+            code=0,
+            message="获取历史记录成功",
+            data=result
+        )
+        
+    except Exception as e:
+        logger.error(f"获取历史记录失败: {e}")
+        return HistoryResponse(
+            code=ResponseCode.INTERNAL_ERROR,
+            message=f"获取历史记录失败: {e}",
+            data={"records": [], "pagination": {}}
+        )
 
 
 # ==================== 视频流处理API ====================
