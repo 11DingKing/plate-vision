@@ -20,7 +20,8 @@ from .schemas import (
     RecognitionResponse, ImageRecognitionRequest, UrlRecognitionRequest,
     HealthResponse, BatchRecognitionRequest, BatchRecognitionResponse,
     PlateDetectionResult, BoundingBox, CharResultSchema, PlateTypeEnum,
-    VideoRecognitionRequest, VideoRecognitionResponse, FrameResult, CharBoundingBox
+    VideoRecognitionRequest, VideoRecognitionResponse, FrameResult, CharBoundingBox,
+    HistoryResponse, HistoryStatsResponse
 )
 from ..detector import PlateDetector
 from ..detector.plate_detector import VideoPlateDetector
@@ -32,6 +33,7 @@ from ..utils.constants import (
     SUPPORTED_VIDEO_FORMATS
 )
 from ..utils.output_saver import save_recognition_result, get_output_saver
+from ..utils.history_manager import get_history_manager
 
 # 创建路由器
 router = APIRouter()
@@ -375,6 +377,21 @@ async def _process_image(
             result_data["saved_to"] = saved_path
     except Exception as e:
         logger.warning(f"保存本地文件失败: {e}")
+    
+    # 保存到历史记录
+    try:
+        history_manager = get_history_manager()
+        records = []
+        for plate in plates:
+            records.append({
+                "plate_number": plate["plate_number"],
+                "confidence": plate["confidence"],
+                "plate_type": plate["plate_type"]
+            })
+        if records:
+            history_manager.add_records(records, image_id=image_id)
+    except Exception as e:
+        logger.warning(f"保存历史记录失败: {e}")
     
     return RecognitionResponse(
         code=ResponseCode.SUCCESS,
@@ -1087,3 +1104,115 @@ async def get_supported_video_formats():
         "min_resolution": "480P (640x480)",
         "target_fps_range": {"min": 1, "max": 60, "default": 25}
     }
+
+
+# ==================== 历史记录API ====================
+
+@router.get("/history", response_model=HistoryResponse, tags=["历史记录"])
+async def get_history(
+    page: int = Query(1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量，最多100条"),
+    plate_number: Optional[str] = Query(None, description="可选，按车牌号过滤")
+):
+    """
+    获取识别历史记录
+    
+    返回最近的识别记录列表，支持分页和按车牌号过滤
+    """
+    try:
+        history_manager = get_history_manager()
+        result = history_manager.get_history(
+            page=page,
+            page_size=page_size,
+            plate_number=plate_number
+        )
+        return HistoryResponse(
+            code=0,
+            message="获取历史记录成功",
+            data=result
+        )
+    except Exception as e:
+        logger.error(f"获取历史记录失败: {e}")
+        return HistoryResponse(
+            code=ResponseCode.INTERNAL_ERROR,
+            message=f"获取历史记录失败: {e}",
+            data=None
+        )
+
+
+@router.get("/history/recent", response_model=HistoryResponse, tags=["历史记录"])
+async def get_recent_history(
+    limit: int = Query(10, ge=1, le=100, description="返回数量，最多100条")
+):
+    """
+    获取最近的识别记录
+    
+    快速获取最近的识别记录，不支持分页
+    """
+    try:
+        history_manager = get_history_manager()
+        records = history_manager.get_recent(limit=limit)
+        return HistoryResponse(
+            code=0,
+            message="获取最近记录成功",
+            data={"records": records}
+        )
+    except Exception as e:
+        logger.error(f"获取最近记录失败: {e}")
+        return HistoryResponse(
+            code=ResponseCode.INTERNAL_ERROR,
+            message=f"获取最近记录失败: {e}",
+            data=None
+        )
+
+
+@router.get("/history/stats", response_model=HistoryStatsResponse, tags=["历史记录"])
+async def get_history_stats():
+    """
+    获取历史记录统计信息
+    
+    返回总记录数、今日记录数、唯一车牌数等统计信息
+    """
+    try:
+        history_manager = get_history_manager()
+        stats = history_manager.get_statistics()
+        return HistoryStatsResponse(
+            code=0,
+            message="获取统计信息成功",
+            data=stats
+        )
+    except Exception as e:
+        logger.error(f"获取统计信息失败: {e}")
+        return HistoryStatsResponse(
+            code=ResponseCode.INTERNAL_ERROR,
+            message=f"获取统计信息失败: {e}",
+            data=None
+        )
+
+
+@router.delete("/history", tags=["历史记录"])
+async def clear_history(
+    older_than_days: Optional[int] = Query(None, ge=1, description="可选，只清除指定天数之前的记录")
+):
+    """
+    清除历史记录
+    
+    可以选择只清除指定天数之前的记录，不指定则清除全部
+    """
+    try:
+        history_manager = get_history_manager()
+        deleted_count = history_manager.clear_history(older_than_days=older_than_days)
+        return {
+            "code": 0,
+            "message": "清除历史记录成功",
+            "data": {
+                "deleted_count": deleted_count
+            }
+        }
+    except Exception as e:
+        logger.error(f"清除历史记录失败: {e}")
+        return {
+            "code": ResponseCode.INTERNAL_ERROR,
+            "message": f"清除历史记录失败: {e}",
+            "data": None
+        }

@@ -236,6 +236,12 @@ async def root():
                 <h3>系统 API</h3>
                 <p><code>GET /api/v1/health</code> - 健康检查</p>
                 <p><code>GET /api/v1/stats</code> - 系统状态</p>
+                
+                <h3>历史记录 API</h3>
+                <p><code>GET /api/v1/history</code> - 获取识别历史记录（支持分页）</p>
+                <p><code>GET /api/v1/history/recent</code> - 获取最近的识别记录</p>
+                <p><code>GET /api/v1/history/stats</code> - 获取历史记录统计信息</p>
+                <p><code>DELETE /api/v1/history</code> - 清除历史记录</p>
             </div>
         </div>
     </body>
