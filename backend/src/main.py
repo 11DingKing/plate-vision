@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 from src.api.routes import router
 from src.utils.logger import setup_logger, get_logger
+from src.utils.database import init_database
 
 # 加载配置
 CONFIG_PATH = ROOT_DIR / "config" / "config.yaml"
